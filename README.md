@@ -27,7 +27,7 @@ steps to exfiltrate data from a windows machine to a web server on the dark web 
 - ## Host the server on TOR
 	- Install `tor` and `obfs4proxy`
 		- `sudo apt install tor obfs4proxy`
-	- configure the `torrc` config file and the obfs4proxy bridges
+	- configure the `torrc` config file and the obfs4proxy bridges, then configure the hidden service
 		- `HiddenServiceDir /var/lib/tor/hidden_service/`
 		- `HiddenServicePort 80 127.0.0.1:80`
 	- the onion link doesn't change as long as you have the private key generated
